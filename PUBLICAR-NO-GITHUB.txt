@@ -1,0 +1,30 @@
+BOLETIM TÉCNICO — PUBLICAÇÃO NO GITHUB PAGES
+
+1) Crie um repositório novo no GitHub, por exemplo: boletim-tecnico
+2) Se sua conta for GitHub Free, deixe o repositório como PUBLIC.
+3) Abra o repositório > Add file > Upload files.
+4) Envie ESTES ARQUIVOS PARA A RAIZ DO REPOSITÓRIO (não envie a pasta inteira):
+   - index.html
+   - manifest.webmanifest
+   - sw.js
+   - icon-192.png
+   - icon-512.png
+   - .nojekyll
+   - LEIA-ME.txt (opcional)
+5) Faça o commit.
+6) Abra Settings > Pages.
+7) Em Build and deployment / Source, selecione "Deploy from a branch".
+8) Em Branch, escolha "main" e a pasta "/ (root)". Salve.
+9) Aguarde a publicação. O GitHub mostrará o endereço HTTPS do site.
+10) Abra esse endereço no celular e no computador.
+
+INSTALAR
+- Android/Chrome: menu do navegador > Instalar app / Adicionar à tela inicial.
+- PC/Chrome ou Edge: ícone de instalação na barra de endereço ou menu > Instalar.
+- iPhone/iPad: Safari > Compartilhar > Adicionar à Tela de Início.
+
+DADOS E PRIVACIDADE
+- As notas NÃO são enviadas para o GitHub. Elas ficam no armazenamento local do navegador/app em cada dispositivo.
+- O código do app pode ficar público sem publicar suas notas.
+- NÃO envie arquivos boletim-backup-*.json ao repositório, pois esses backups contêm suas notas.
+- PC e celular não sincronizam automaticamente nesta versão. Use Exportar backup / Importar backup para transferir os dados.

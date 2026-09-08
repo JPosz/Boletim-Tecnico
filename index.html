@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boletim Técnico — Controle Anual de Notas</title>
+<meta name="theme-color" content="#a45a3f" />
+<meta name="description" content="Boletim escolar anual com cálculo automático, resumo e backup de notas." />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Boletim Técnico" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon-192.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  :root{
+    --paper:#f3ead8;
+    --paper-2:#eadfc8;
+    --ink:#253038;
+    --muted:#6e6b62;
+    --line:#9ba6a3;
+    --copper:#a45a3f;
+    --copper-dark:#7d3f2b;
+    --green:#486b57;
+    --red:#8a4439;
+    --blue:#526d78;
+    --shadow:rgba(50,45,35,.12);
+  }
+
+  *{box-sizing:border-box}
+
+  html{scroll-behavior:smooth}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    color:var(--ink);
+    font-family:"Courier New", Courier, monospace;
+    background:
+      linear-gradient(rgba(82,109,120,.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(82,109,120,.08) 1px, transparent 1px),
+      linear-gradient(rgba(82,109,120,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(82,109,120,.035) 1px, transparent 1px),
+      var(--paper);
+    background-size:28px 28px,28px 28px,7px 7px,7px 7px,auto;
+  }
+
+  button,input,select{font:inherit}
+
+  .app-shell{
+    width:min(1180px, calc(100% - 24px));
+    margin:22px auto 48px;
+  }
+
+  .masthead{
+    position:relative;
+    padding:24px 26px 20px;
+    border:1px solid rgba(37,48,56,.28);
+    border-top:5px solid var(--copper);
+    background:rgba(243,234,216,.88);
+    box-shadow:0 8px 22px var(--shadow);
+  }
+
+  .masthead::after{
+    content:"";
+    position:absolute;
+    left:18px;
+    right:18px;
+    bottom:8px;
+    border-bottom:1px dashed rgba(37,48,56,.25);
+  }
+
+  h1,h2,h3{
+    margin:0;
+    font-family:Georgia, "Times New Roman", serif;
+    font-weight:700;
+  }
+
+  h1{
+    font-size:clamp(1.8rem,4vw,3rem);
+    letter-spacing:.02em;
+  }
+
+  .subtitle{
+    margin-top:9px;
+    color:var(--muted);
+    font-size:.95rem;
+    line-height:1.5;
+  }
+
+  .save-state{
+    display:inline-flex;
+    gap:8px;
+    align-items:center;
+    margin-top:12px;
+    color:var(--green);
+    font-size:.82rem;
+  }
+
+  .save-dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:currentColor;
+    box-shadow:0 0 0 3px rgba(72,107,87,.13);
+  }
+
+  .tabs{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+    margin:18px 0;
+  }
+
+  .tab-btn{
+    appearance:none;
+    border:1px solid rgba(37,48,56,.32);
+    background:rgba(234,223,200,.78);
+    color:var(--ink);
+    padding:10px 13px;
+    cursor:pointer;
+    box-shadow:2px 2px 0 rgba(37,48,56,.12);
+    transition:.15s ease;
+  }
+
+  .tab-btn:hover{transform:translateY(-1px)}
+
+  .tab-btn.active{
+    background:var(--copper);
+    color:#fffaf1;
+    border-color:var(--copper-dark);
+  }
+
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  .sheet{
+    padding:22px;
+    border:1px solid rgba(37,48,56,.28);
+    background:rgba(243,234,216,.90);
+    box-shadow:0 8px 22px var(--shadow);
+  }
+
+  .section-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:18px;
+  }
+
+  .section-head p{
+    max-width:750px;
+    margin:7px 0 0;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  .summary-strip{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+    margin-bottom:18px;
+  }
+
+  .metric{
+    border:1px solid rgba(37,48,56,.25);
+    border-left:4px solid var(--copper);
+    background:rgba(255,250,241,.62);
+    padding:14px;
+  }
+
+  .metric .label{
+    color:var(--muted);
+    font-size:.78rem;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+  }
+
+  .metric .value{
+    margin-top:6px;
+    font-family:Georgia, "Times New Roman", serif;
+    font-size:1.45rem;
+    font-weight:700;
+  }
+
+  .config-grid{
+    display:grid;
+    gap:10px;
+  }
+
+  .config-row{
+    display:grid;
+    grid-template-columns:minmax(260px,1.6fr) minmax(260px,1fr);
+    gap:14px;
+    align-items:center;
+    padding:13px 14px;
+    border:1px solid rgba(37,48,56,.22);
+    background:rgba(255,250,241,.52);
+  }
+
+  .subject-name{
+    font-family:Georgia, "Times New Roman", serif;
+    font-weight:700;
+    line-height:1.25;
+  }
+
+  select,.note-input{
+    width:100%;
+    border:1px solid rgba(37,48,56,.35);
+    border-radius:0;
+    background:#fffaf1;
+    color:var(--ink);
+    padding:9px 10px;
+    outline:none;
+  }
+
+  select:focus,.note-input:focus{
+    border-color:var(--copper);
+    box-shadow:0 0 0 2px rgba(164,90,63,.14);
+  }
+
+  .formula-note{
+    margin:15px 0 0;
+    padding:12px 14px;
+    border-left:4px solid var(--blue);
+    background:rgba(82,109,120,.08);
+    color:var(--muted);
+    line-height:1.55;
+    font-size:.86rem;
+  }
+
+  .accordion-list{
+    display:grid;
+    gap:11px;
+  }
+
+  details.subject-card{
+    border:1px solid rgba(37,48,56,.26);
+    background:rgba(255,250,241,.60);
+    box-shadow:3px 3px 0 rgba(37,48,56,.06);
+  }
+
+  details.subject-card[open]{
+    border-left:4px solid var(--copper);
+  }
+
+  details.subject-card summary{
+    list-style:none;
+    cursor:pointer;
+    padding:14px 15px;
+  }
+
+  details.subject-card summary::-webkit-details-marker{display:none}
+
+  .summary-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    gap:12px;
+    align-items:center;
+  }
+
+  .summary-subject{
+    font-family:Georgia, "Times New Roman", serif;
+    font-weight:700;
+    line-height:1.25;
+  }
+
+  .summary-score{
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .status-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:116px;
+    border:1px solid currentColor;
+    padding:5px 8px;
+    font-size:.75rem;
+    white-space:nowrap;
+  }
+
+  .status-chip.ok{color:var(--green); background:rgba(72,107,87,.08)}
+  .status-chip.miss{color:var(--red); background:rgba(138,68,57,.07)}
+  .status-chip.pending{color:var(--muted); background:rgba(110,107,98,.07)}
+
+  .card-body{
+    padding:0 15px 16px;
+    border-top:1px dashed rgba(37,48,56,.22);
+  }
+
+  .formula-label{
+    margin:13px 0;
+    color:var(--muted);
+    font-size:.80rem;
+  }
+
+  .notes-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+    gap:10px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:5px;
+    color:var(--muted);
+    font-size:.78rem;
+  }
+
+  .manual-actions{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+
+  .small-btn{
+    border:1px solid rgba(37,48,56,.35);
+    background:var(--paper-2);
+    color:var(--ink);
+    padding:7px 10px;
+    cursor:pointer;
+  }
+
+  .small-btn:hover{border-color:var(--copper)}
+  .small-btn.danger{color:var(--red)}
+
+  .calc-box{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:9px;
+  }
+
+  .calc-item{
+    padding:10px;
+    background:rgba(82,109,120,.06);
+    border-top:1px solid rgba(37,48,56,.20);
+  }
+
+  .calc-item span{
+    display:block;
+    color:var(--muted);
+    font-size:.75rem;
+    margin-bottom:4px;
+  }
+
+  .calc-item strong{
+    font-family:Georgia, "Times New Roman", serif;
+    font-size:1.08rem;
+  }
+
+  .annual-table-wrap{
+    overflow:auto;
+    border:1px solid rgba(37,48,56,.24);
+  }
+
+  table{
+    width:100%;
+    min-width:820px;
+    border-collapse:collapse;
+    background:rgba(255,250,241,.58);
+  }
+
+  th,td{
+    padding:11px 10px;
+    border-bottom:1px solid rgba(37,48,56,.18);
+    border-right:1px solid rgba(37,48,56,.12);
+    text-align:center;
+  }
+
+  th{
+    position:sticky;
+    top:0;
+    background:var(--paper-2);
+    font-family:Georgia, "Times New Roman", serif;
+  }
+
+  th:first-child,td:first-child{text-align:left}
+
+  .annual-subject{
+    font-family:Georgia, "Times New Roman", serif;
+    font-weight:700;
+  }
+
+  .annual-status{
+    font-weight:700;
+  }
+
+  .annual-status.ok{color:var(--green)}
+  .annual-status.miss{color:var(--red)}
+  .annual-status.pending{color:var(--muted)}
+
+  .config-actions{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:18px;
+  }
+
+  .reset-btn{
+    border:1px solid var(--red);
+    background:transparent;
+    color:var(--red);
+    padding:9px 12px;
+    cursor:pointer;
+  }
+
+  .reset-btn:hover{
+    background:rgba(138,68,57,.07);
+  }
+
+  .footnote{
+    color:var(--muted);
+    margin-top:18px;
+    font-size:.78rem;
+    line-height:1.45;
+  }
+
+  @media (max-width:760px){
+    .app-shell{width:min(100% - 14px,1180px); margin-top:7px}
+    .masthead,.sheet{padding:16px}
+    .summary-strip{grid-template-columns:1fr}
+    .config-row{grid-template-columns:1fr}
+    .summary-row{grid-template-columns:1fr auto}
+    .summary-row .status-chip{grid-column:1/-1; justify-self:start}
+    .calc-box{grid-template-columns:1fr}
+  }
+
+
+  .app-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:14px;
+  }
+
+  .action-btn{
+    border:1px solid rgba(37,48,56,.35);
+    background:rgba(255,250,241,.72);
+    color:var(--ink);
+    padding:8px 11px;
+    cursor:pointer;
+    box-shadow:2px 2px 0 rgba(37,48,56,.08);
+  }
+
+  .action-btn:hover{border-color:var(--copper)}
+  .action-btn.primary{background:var(--copper); color:#fffaf1; border-color:var(--copper-dark)}
+  .action-btn[hidden]{display:none}
+
+  .backup-info{
+    margin-top:9px;
+    color:var(--muted);
+    font-size:.78rem;
+  }
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:22px;
+    transform:translateX(-50%);
+    z-index:999;
+    max-width:min(92vw,560px);
+    padding:10px 14px;
+    border:1px solid rgba(37,48,56,.35);
+    background:#fffaf1;
+    box-shadow:0 8px 24px rgba(50,45,35,.18);
+    opacity:0;
+    pointer-events:none;
+    transition:.2s ease;
+  }
+
+  .toast.show{opacity:1}
+
+  .install-hint{
+    margin-top:13px;
+    padding:10px 12px;
+    border-left:4px solid var(--copper);
+    background:rgba(164,90,63,.06);
+    color:var(--muted);
+    font-size:.8rem;
+    line-height:1.45;
+  }
+
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="masthead">
+    <h1>Boletim Técnico</h1>
+    <div class="subtitle">Controle anual de notas • 25 + 35 + 40 = 100 pontos • média anual: 60</div>
+    <div class="save-state" id="saveState"><span class="save-dot"></span><span>Carregando dados...</span></div>
+    <div class="app-actions">
+      <button class="action-btn primary" id="installApp" hidden>Instalar aplicativo</button>
+      <button class="action-btn" id="exportBackup">Exportar backup</button>
+      <button class="action-btn" id="importBackup">Importar backup</button>
+      <input type="file" id="backupFile" accept="application/json,.json" hidden />
+    </div>
+    <div class="backup-info" id="backupInfo">Backup manual ainda não criado.</div>
+    <div class="install-hint" id="installHint">Depois de publicar estes arquivos em um endereço HTTPS, o app poderá ser instalado no celular e no computador e funcionará offline.</div>
+  </header>
+
+  <nav class="tabs" aria-label="Seções do boletim">
+    <button class="tab-btn active" data-tab="config">Configuração</button>
+    <button class="tab-btn" data-tab="tri0">1º Trimestre</button>
+    <button class="tab-btn" data-tab="tri1">2º Trimestre</button>
+    <button class="tab-btn" data-tab="tri2">3º Trimestre</button>
+    <button class="tab-btn" data-tab="annual">Resumo Anual</button>
+  </nav>
+
+  <main>
+    <section id="config" class="tab-panel active sheet"></section>
+    <section id="tri0" class="tab-panel sheet"></section>
+    <section id="tri1" class="tab-panel sheet"></section>
+    <section id="tri2" class="tab-panel sheet"></section>
+    <section id="annual" class="tab-panel sheet"></section>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "boletim-tecnico-v1";
+
+  const SUBJECTS = [
+    "Língua Portuguesa e Literatura Brasileira",
+    "L. E. M. (Língua Inglesa)",
+    "Educação Física",
+    "História",
+    "Matemática",
+    "Física",
+    "Filosofia",
+    "Sistemas Microprocessados I",
+    "Eletrônica Analógica",
+    "Elementos de Programação",
+    "Sistemas de Comunicações I"
+  ];
+
+  const TRIMESTERS = [
+    { name: "1º Trimestre", total: 25 },
+    { name: "2º Trimestre", total: 35 },
+    { name: "3º Trimestre", total: 40 }
+  ];
+
+  const FORMULAS = {
+    f1: {
+      name: "Fórmula 1 — 30% + 30% + 40%",
+      count: 3,
+      short: "(N1×0,3 + N2×0,3 + N3×0,4) × Total/10"
+    },
+    f2: {
+      name: "Fórmula 2 — média simples de 3 notas",
+      count: 3,
+      short: "(N1/3 + N2/3 + N3/3) × Total/10"
+    },
+    f3: {
+      name: "Fórmula 3 — 50% + 50%",
+      count: 2,
+      short: "(N1×0,5 + N2×0,5) × Total/10"
+    },
+    f4: {
+      name: "Fórmula 4 — 10% + 10% + 40% + 40%",
+      count: 4,
+      short: "(N1×0,1 + N2×0,1 + N3×0,4 + N4×0,4) × Total/10"
+    },
+    manual: {
+      name: "Notas diretas (manual)",
+      count: null,
+      short: "Soma simples dos campos lançados"
+    }
+  };
+
+  const makeDefaultState = () => ({
+    methods: Object.fromEntries(SUBJECTS.map((_, i) => [i, "f1"])),
+    notes: Object.fromEntries(TRIMESTERS.map((_, ti) => [
+      ti,
+      Object.fromEntries(SUBJECTS.map((_, si) => [si, ["", "", "", ""]]))
+    ])),
+    manualCounts: Object.fromEntries(TRIMESTERS.map((_, ti) => [
+      ti,
+      Object.fromEntries(SUBJECTS.map((_, si) => [si, 1]))
+    ]))
+  });
+
+  let state = makeDefaultState();
+  let saveTimer = null;
+  let deferredInstallPrompt = null;
+
+  function toast(message) {
+    const el = document.getElementById("toast");
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function formatDateTime(value) {
+    try { return new Date(value).toLocaleString("pt-BR"); }
+    catch { return String(value); }
+  }
+
+  function updateBackupInfo() {
+    const el = document.getElementById("backupInfo");
+    if (!el) return;
+    let last = null;
+    try { last = localStorage.getItem(STORAGE_KEY + "-last-backup"); } catch (e) {}
+    el.textContent = last ? `Último backup exportado: ${formatDateTime(last)}` : "Backup manual ainda não criado.";
+  }
+
+  function exportBackup() {
+    const payload = {
+      app: "Boletim Técnico",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: state
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `boletim-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    try { localStorage.setItem(STORAGE_KEY + "-last-backup", new Date().toISOString()); } catch (e) {}
+    updateBackupInfo();
+    toast("Backup exportado.");
+  }
+
+  async function importBackupFile(file) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const incoming = parsed?.data ?? parsed;
+      state = normalizeState(incoming);
+      renderAll();
+      await saveNow();
+      toast("Backup importado com sucesso.");
+    } catch (e) {
+      console.error(e);
+      alert("Não foi possível importar este backup. Verifique se o arquivo JSON pertence ao Boletim Técnico.");
+    }
+  }
+
+  function setupInstallUI() {
+    const installBtn = document.getElementById("installApp");
+    const hint = document.getElementById("installHint");
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      if (installBtn) installBtn.hidden = false;
+      if (hint) hint.textContent = "Este dispositivo permite instalar o Boletim Técnico como aplicativo.";
+    });
+
+    if (installBtn) installBtn.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) {
+        toast("Use o menu do navegador e escolha Instalar app / Adicionar à tela inicial.");
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.hidden = true;
+    });
+
+    window.addEventListener("appinstalled", () => {
+      if (hint) hint.textContent = "Boletim Técnico instalado neste dispositivo.";
+      toast("Aplicativo instalado.");
+    });
+  }
+
+  function setupBackupUI() {
+    const exportBtn = document.getElementById("exportBackup");
+    const importBtn = document.getElementById("importBackup");
+    const fileInput = document.getElementById("backupFile");
+    exportBtn?.addEventListener("click", exportBackup);
+    importBtn?.addEventListener("click", () => fileInput?.click());
+    fileInput?.addEventListener("change", async e => {
+      await importBackupFile(e.target.files?.[0]);
+      e.target.value = "";
+    });
+    updateBackupInfo();
+  }
+
+  async function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      await navigator.serviceWorker.register("./sw.js");
+    } catch (e) {
+      console.warn("Service Worker não registrado:", e);
+    }
+  }
+
+  function normalizeState(raw) {
+    const base = makeDefaultState();
+    if (!raw || typeof raw !== "object") return base;
+
+    SUBJECTS.forEach((_, si) => {
+      const m = raw.methods?.[si];
+      if (m && FORMULAS[m]) base.methods[si] = m;
+    });
+
+    TRIMESTERS.forEach((_, ti) => {
+      SUBJECTS.forEach((_, si) => {
+        const arr = raw.notes?.[ti]?.[si];
+        if (Array.isArray(arr)) {
+          base.notes[ti][si] = arr.map(v => v === null || v === undefined ? "" : String(v));
+          while (base.notes[ti][si].length < 4) base.notes[ti][si].push("");
+        }
+        const c = Number(raw.manualCounts?.[ti]?.[si]);
+        if (Number.isInteger(c) && c >= 1) base.manualCounts[ti][si] = c;
+      });
+    });
+
+    return base;
+  }
+
+  const persistentStore = {
+    async get(key) {
+      try {
+        if (window.storage) {
+          if (typeof window.storage.getItem === "function") {
+            const value = await window.storage.getItem(key);
+            return value?.value ?? value ?? null;
+          }
+          if (typeof window.storage.get === "function") {
+            const value = await window.storage.get(key);
+            return value?.value ?? value ?? null;
+          }
+        }
+      } catch (e) {
+        console.warn("window.storage indisponível na leitura:", e);
+      }
+
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    },
+
+    async set(key, value) {
+      let stored = false;
+
+      try {
+        if (window.storage) {
+          if (typeof window.storage.setItem === "function") {
+            await window.storage.setItem(key, value);
+            stored = true;
+          } else if (typeof window.storage.set === "function") {
+            await window.storage.set(key, value);
+            stored = true;
+          }
+        }
+      } catch (e) {
+        console.warn("window.storage indisponível na gravação:", e);
+      }
+
+      if (!stored) {
+        try {
+          localStorage.setItem(key, value);
+          stored = true;
+        } catch (e) {
+          console.warn("localStorage indisponível:", e);
+        }
+      }
+
+      return stored;
+    },
+
+    async remove(key) {
+      try {
+        if (window.storage) {
+          if (typeof window.storage.removeItem === "function") {
+            await window.storage.removeItem(key);
+            return;
+          }
+          if (typeof window.storage.delete === "function") {
+            await window.storage.delete(key);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      try { localStorage.removeItem(key); } catch (e) {}
+    }
+  };
+
+  function setSaveMessage(text, kind = "ok") {
+    const el = document.getElementById("saveState");
+    if (!el) return;
+    el.style.color = kind === "error" ? "var(--red)" : "var(--green)";
+    el.querySelector("span:last-child").textContent = text;
+  }
+
+  async function saveNow() {
+    const ok = await persistentStore.set(STORAGE_KEY, JSON.stringify(state));
+    setSaveMessage(ok ? "Dados salvos automaticamente" : "Não foi possível salvar neste navegador", ok ? "ok" : "error");
+  }
+
+  function scheduleSave() {
+    setSaveMessage("Salvando...");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 180);
+  }
+
+  function roundHalfUp(value) {
+    return Math.floor((value + Number.EPSILON) + 0.5);
+  }
+
+  function getVisibleCount(si, ti) {
+    const method = state.methods[si];
+    return method === "manual"
+      ? Math.max(1, state.manualCounts[ti][si] || 1)
+      : FORMULAS[method].count;
+  }
+
+  function ensureNoteSlots(ti, si, count) {
+    while (state.notes[ti][si].length < count) state.notes[ti][si].push("");
+  }
+
+  function parseInputValue(v) {
+    if (v === "" || v === null || v === undefined) return null;
+    const n = Number(String(v).replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function calcSubject(si, ti) {
+    const method = state.methods[si];
+    const total = TRIMESTERS[ti].total;
+    const count = getVisibleCount(si, ti);
+    ensureNoteSlots(ti, si, count);
+
+    const rawValues = state.notes[ti][si].slice(0, count);
+    const values = rawValues.map(parseInputValue);
+    const filled = values.length > 0 && values.every(v => v !== null);
+
+    if (!filled) {
+      return { filled: false, raw: null, rounded: null };
+    }
+
+    let raw = 0;
+
+    if (method === "manual") {
+      raw = values.reduce((sum, v) => sum + v, 0);
+    } else if (method === "f1") {
+      raw = (values[0] * 0.3 + values[1] * 0.3 + values[2] * 0.4) * total / 10;
+    } else if (method === "f2") {
+      raw = ((values[0] + values[1] + values[2]) / 3) * total / 10;
+    } else if (method === "f3") {
+      raw = (values[0] * 0.5 + values[1] * 0.5) * total / 10;
+    } else if (method === "f4") {
+      raw = (values[0] * 0.1 + values[1] * 0.1 + values[2] * 0.4 + values[3] * 0.4) * total / 10;
+    }
+
+    return { filled: true, raw, rounded: roundHalfUp(raw) };
+  }
+
+  function trimThreshold(ti) {
+    return TRIMESTERS[ti].total * 0.60;
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;");
+  }
+
+  function renderConfig() {
+    const panel = document.getElementById("config");
+
+    const rows = SUBJECTS.map((subject, si) => {
+      const options = Object.entries(FORMULAS).map(([key, data]) =>
+        `<option value="${key}" ${state.methods[si] === key ? "selected" : ""}>${escapeHtml(data.name)}</option>`
+      ).join("");
+
+      return `
+        <div class="config-row">
+          <div class="subject-name">${escapeHtml(subject)}</div>
+          <select data-method-subject="${si}" aria-label="Método de cálculo para ${escapeHtml(subject)}">
+            ${options}
+          </select>
+        </div>`;
+    }).join("");
+
+    panel.innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>Configuração</h2>
+          <p>Escolha o método de cálculo de cada matéria. A escolha vale para os três trimestres e pode ser alterada depois sem apagar as notas já digitadas.</p>
+        </div>
+      </div>
+
+      <div class="config-grid">${rows}</div>
+
+      <div class="formula-note">
+        <strong>F1:</strong> 30% + 30% + 40% &nbsp;•&nbsp;
+        <strong>F2:</strong> três notas com o mesmo peso &nbsp;•&nbsp;
+        <strong>F3:</strong> duas notas com 50% cada &nbsp;•&nbsp;
+        <strong>F4:</strong> 10% + 10% + 40% + 40% &nbsp;•&nbsp;
+        <strong>Manual:</strong> soma direta dos valores digitados.
+      </div>
+
+      <div class="config-actions">
+        <button class="reset-btn" id="resetAll">Apagar todos os dados</button>
+      </div>
+
+      <div class="footnote">
+        Em fórmulas automáticas, as notas de entrada são consideradas numa escala de 0 a 10. No modo manual, os valores são somados diretamente em pontos do trimestre.
+      </div>
+    `;
+
+    panel.querySelectorAll("[data-method-subject]").forEach(select => {
+      select.addEventListener("change", e => {
+        const si = Number(e.target.dataset.methodSubject);
+        state.methods[si] = e.target.value;
+        renderAll();
+        scheduleSave();
+      });
+    });
+
+    panel.querySelector("#resetAll").addEventListener("click", async () => {
+      const yes = confirm("Apagar todas as configurações e notas salvas?");
+      if (!yes) return;
+      state = makeDefaultState();
+      await persistentStore.remove(STORAGE_KEY);
+      renderAll();
+      await saveNow();
+    });
+  }
+
+  function trimesterMetrics(ti) {
+    let sum = 0;
+    let filled = 0;
+    let reached = 0;
+
+    SUBJECTS.forEach((_, si) => {
+      const r = calcSubject(si, ti);
+      if (r.filled) {
+        filled++;
+        sum += r.rounded;
+        if (r.rounded >= trimThreshold(ti)) reached++;
+      }
+    });
+
+    return { sum, filled, reached };
+  }
+
+  function subjectStatusForTrimester(si, ti) {
+    const result = calcSubject(si, ti);
+    const need = trimThreshold(ti);
+
+    if (!result.filled) {
+      return { text: "Não preenchido", cls: "pending", missing: null };
+    }
+
+    if (result.rounded >= need) {
+      return { text: "Média atingida", cls: "ok", missing: 0 };
+    }
+
+    const missing = Math.ceil(need - result.rounded);
+    return { text: `Faltam ${missing} pts`, cls: "miss", missing };
+  }
+
+  function renderTrimester(ti) {
+    const panel = document.getElementById(`tri${ti}`);
+    const trimester = TRIMESTERS[ti];
+    const metrics = trimesterMetrics(ti);
+    const maxClassSum = trimester.total * SUBJECTS.length;
+    const threshold = trimThreshold(ti);
+
+    const cards = SUBJECTS.map((subject, si) => {
+      const method = state.methods[si];
+      const count = getVisibleCount(si, ti);
+      ensureNoteSlots(ti, si, count);
+      const result = calcSubject(si, ti);
+      const status = subjectStatusForTrimester(si, ti);
+
+      const fields = Array.from({length: count}, (_, ni) => {
+        const value = state.notes[ti][si][ni] ?? "";
+        const isManual = method === "manual";
+        return `
+          <div class="field">
+            <label for="n-${ti}-${si}-${ni}">Nota ${ni + 1}</label>
+            <input
+              class="note-input"
+              id="n-${ti}-${si}-${ni}"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              ${isManual ? "" : 'max="10"'}
+              step="0.1"
+              value="${escapeHtml(value)}"
+              data-note-ti="${ti}"
+              data-note-si="${si}"
+              data-note-ni="${ni}"
+              placeholder="${isManual ? "pontos" : "0 a 10"}"
+            />
+          </div>`;
+      }).join("");
+
+      const manualActions = method === "manual" ? `
+        <div class="manual-actions">
+          <button class="small-btn" data-add-note="${ti}:${si}">+ Adicionar nota</button>
+          <button class="small-btn danger" data-remove-note="${ti}:${si}" ${count <= 1 ? "disabled" : ""}>− Remover última</button>
+        </div>` : "";
+
+      const scoreText = result.filled ? `${result.rounded} / ${trimester.total}` : `— / ${trimester.total}`;
+      const missingText = !result.filled
+        ? "—"
+        : (result.rounded >= threshold ? "0" : Math.ceil(threshold - result.rounded));
+
+      return `
+        <details class="subject-card">
+          <summary>
+            <div class="summary-row">
+              <div class="summary-subject">${escapeHtml(subject)}</div>
+              <div class="summary-score">${scoreText}</div>
+              <div class="status-chip ${status.cls}">${escapeHtml(status.text)}</div>
+            </div>
+          </summary>
+          <div class="card-body">
+            <div class="formula-label">${escapeHtml(FORMULAS[method].name)} • ${escapeHtml(FORMULAS[method].short)}</div>
+            <div class="notes-grid">${fields}</div>
+            ${manualActions}
+            <div class="calc-box">
+              <div class="calc-item">
+                <span>Nota do trimestre</span>
+                <strong>${result.filled ? result.rounded : "—"} / ${trimester.total}</strong>
+              </div>
+              <div class="calc-item">
+                <span>Média necessária (60%)</span>
+                <strong>${threshold.toLocaleString("pt-BR")} pts</strong>
+              </div>
+              <div class="calc-item">
+                <span>Quanto falta</span>
+                <strong>${result.filled ? (missingText === "0" ? "Média atingida" : missingText + " pts") : "—"}</strong>
+              </div>
+            </div>
+          </div>
+        </details>`;
+    }).join("");
+
+    panel.innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>${trimester.name}</h2>
+          <p>Total por matéria: ${trimester.total} pontos. A nota final de cada matéria é arredondada para inteiro com regra de 0,5 para cima.</p>
+        </div>
+      </div>
+
+      <div class="summary-strip">
+        <div class="metric">
+          <div class="label">Soma lançada</div>
+          <div class="value">${metrics.sum} / ${maxClassSum}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Matérias preenchidas</div>
+          <div class="value">${metrics.filled} / ${SUBJECTS.length}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Média atingida no trimestre</div>
+          <div class="value">${metrics.reached} / ${SUBJECTS.length}</div>
+        </div>
+      </div>
+
+      <div class="accordion-list">${cards}</div>
+    `;
+
+    panel.querySelectorAll("[data-note-ti]").forEach(input => {
+      input.addEventListener("input", e => {
+        const ti2 = Number(e.target.dataset.noteTi);
+        const si = Number(e.target.dataset.noteSi);
+        const ni = Number(e.target.dataset.noteNi);
+        state.notes[ti2][si][ni] = e.target.value;
+        scheduleSave();
+
+        // Atualiza sem fechar o accordion e sem tirar o foco do campo.
+        updateTrimesterLive(ti2, si);
+        renderAnnual();
+      });
+    });
+
+    panel.querySelectorAll("[data-add-note]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const [ti2, si] = e.currentTarget.dataset.addNote.split(":").map(Number);
+        state.manualCounts[ti2][si]++;
+        ensureNoteSlots(ti2, si, state.manualCounts[ti2][si]);
+        renderTrimester(ti2);
+        renderAnnual();
+        scheduleSave();
+      });
+    });
+
+    panel.querySelectorAll("[data-remove-note]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const [ti2, si] = e.currentTarget.dataset.removeNote.split(":").map(Number);
+        if (state.manualCounts[ti2][si] <= 1) return;
+        const removedIndex = state.manualCounts[ti2][si] - 1;
+        state.manualCounts[ti2][si]--;
+        // Mantém o valor guardado para evitar perda acidental ao reabrir campos.
+        renderTrimester(ti2);
+        renderAnnual();
+        scheduleSave();
+      });
+    });
+  }
+
+  function updateTrimesterLive(ti, changedSi) {
+    const panel = document.getElementById(`tri${ti}`);
+    const metrics = trimesterMetrics(ti);
+    const metricValues = panel.querySelectorAll(".metric .value");
+    if (metricValues.length >= 3) {
+      metricValues[0].textContent = `${metrics.sum} / ${TRIMESTERS[ti].total * SUBJECTS.length}`;
+      metricValues[1].textContent = `${metrics.filled} / ${SUBJECTS.length}`;
+      metricValues[2].textContent = `${metrics.reached} / ${SUBJECTS.length}`;
+    }
+
+    const cards = panel.querySelectorAll("details.subject-card");
+    const card = cards[changedSi];
+    if (!card) return;
+
+    const result = calcSubject(changedSi, ti);
+    const status = subjectStatusForTrimester(changedSi, ti);
+    const threshold = trimThreshold(ti);
+
+    const score = card.querySelector(".summary-score");
+    if (score) score.textContent = result.filled ? `${result.rounded} / ${TRIMESTERS[ti].total}` : `— / ${TRIMESTERS[ti].total}`;
+
+    const chip = card.querySelector(".status-chip");
+    if (chip) {
+      chip.textContent = status.text;
+      chip.className = `status-chip ${status.cls}`;
+    }
+
+    const calcStrong = card.querySelectorAll(".calc-item strong");
+    if (calcStrong.length >= 3) {
+      calcStrong[0].textContent = result.filled ? `${result.rounded} / ${TRIMESTERS[ti].total}` : `— / ${TRIMESTERS[ti].total}`;
+      calcStrong[1].textContent = `${threshold.toLocaleString("pt-BR")} pts`;
+      calcStrong[2].textContent = !result.filled
+        ? "—"
+        : (result.rounded >= threshold ? "Média atingida" : `${Math.ceil(threshold - result.rounded)} pts`);
+    }
+  }
+
+  function annualResult(si) {
+    const results = TRIMESTERS.map((_, ti) => calcSubject(si, ti));
+    const complete = results.every(r => r.filled);
+
+    if (!complete) {
+      const knownTotal = results.reduce((sum, r) => sum + (r.filled ? r.rounded : 0), 0);
+      return { complete: false, total: knownTotal, status: "Incompleto", cls: "pending" };
+    }
+
+    const total = results.reduce((sum, r) => sum + r.rounded, 0);
+
+    if (total >= 60) {
+      return { complete: true, total, status: "Atingiu", cls: "ok" };
+    }
+
+    return { complete: true, total, status: `Faltam ${60 - total} pts`, cls: "miss" };
+  }
+
+  function renderAnnual() {
+    const panel = document.getElementById("annual");
+
+    let reached = 0;
+    let complete = 0;
+
+    const rows = SUBJECTS.map((subject, si) => {
+      const r = annualResult(si);
+      if (r.complete) complete++;
+      if (r.complete && r.total >= 60) reached++;
+
+      const triCells = TRIMESTERS.map((_, ti) => {
+        const tr = calcSubject(si, ti);
+        return `<td>${tr.filled ? tr.rounded : "—"}</td>`;
+      }).join("");
+
+      return `
+        <tr>
+          <td class="annual-subject">${escapeHtml(subject)}</td>
+          ${triCells}
+          <td><strong>${r.complete ? r.total : r.total + "*"}</strong></td>
+          <td class="annual-status ${r.cls}">${escapeHtml(r.status)}</td>
+        </tr>`;
+    }).join("");
+
+    panel.innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>Resumo Anual</h2>
+          <p>O total anual de cada matéria soma os três trimestres. A média anual é 60 pontos de 100.</p>
+        </div>
+      </div>
+
+      <div class="summary-strip">
+        <div class="metric">
+          <div class="label">Matérias que já atingiram 60</div>
+          <div class="value">${reached} / ${SUBJECTS.length}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Matérias completas</div>
+          <div class="value">${complete} / ${SUBJECTS.length}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Média anual</div>
+          <div class="value">60 / 100</div>
+        </div>
+      </div>
+
+      <div class="annual-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Matéria</th>
+              <th>1º Tri<br><small>/25</small></th>
+              <th>2º Tri<br><small>/35</small></th>
+              <th>3º Tri<br><small>/40</small></th>
+              <th>Total<br><small>/100</small></th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <div class="footnote">
+        * Quando uma matéria está incompleta, o total com asterisco mostra apenas os trimestres que já foram totalmente preenchidos; o status permanece “Incompleto”.
+      </div>
+    `;
+  }
+
+  function renderAll() {
+    renderConfig();
+    renderTrimester(0);
+    renderTrimester(1);
+    renderTrimester(2);
+    renderAnnual();
+  }
+
+  function initTabs() {
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.tab).classList.add("active");
+      });
+    });
+  }
+
+  async function init() {
+    initTabs();
+    setupInstallUI();
+    setupBackupUI();
+    registerServiceWorker();
+
+    try {
+      const saved = await persistentStore.get(STORAGE_KEY);
+      if (saved) {
+        const parsed = typeof saved === "string" ? JSON.parse(saved) : saved;
+        state = normalizeState(parsed);
+        setSaveMessage("Dados carregados");
+      } else {
+        setSaveMessage("Pronto para salvar automaticamente");
+      }
+    } catch (e) {
+      console.error(e);
+      setSaveMessage("Não foi possível carregar os dados salvos", "error");
+    }
+
+    renderAll();
+  }
+
+  init();
+})();
+</script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

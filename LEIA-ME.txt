@@ -1,0 +1,22 @@
+BOLETIM TÉCNICO — VERSÃO INSTALÁVEL (PWA)
+
+Arquivos principais:
+- index.html
+- manifest.webmanifest
+- sw.js
+- icon-192.png
+- icon-512.png
+
+IMPORTANTE
+Para instalar como aplicativo e usar offline, estes arquivos precisam ser publicados juntos em um endereço HTTPS. Abrir index.html diretamente pelo gerenciador de arquivos funciona como site, mas não permite a instalação PWA/service worker de forma confiável.
+
+Depois de publicado:
+1. Abra o endereço no navegador.
+2. No PC/Android, use o botão “Instalar aplicativo” quando aparecer, ou a opção “Instalar app” do navegador.
+3. No iPhone/iPad, abra no Safari > Compartilhar > Adicionar à Tela de Início.
+
+DADOS
+As notas são salvas automaticamente no armazenamento local do app/navegador daquele dispositivo.
+Use “Exportar backup” para gerar um arquivo JSON e “Importar backup” para levar as notas entre celular e computador.
+
+Se os dados do navegador/app forem apagados, o armazenamento local também pode ser perdido. Por isso, mantenha backups periódicos.
