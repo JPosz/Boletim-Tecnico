@@ -6,8 +6,10 @@
   const SESSION_KEY = "boletim-cloud-session-v1";
   const SUPABASE_URL = "https://qdkysernznhbyvcxdrnh.supabase.co";
   const API_KEY = "sb_publishable_-4fGJcPedymP3ILk-z_-pw_8kVqyHvu";
+  const APP_URL = "https://jposz.github.io/Boletim-Tecnico/";
 
-  let session = loadSession();
+  let confirmedFromRedirect = false;
+  let session = captureRedirectSession() || loadSession();
   let lastLocalSnapshot = safeGet(LOCAL_KEY);
   let localChangeTimer = null;
   let applyingRemote = false;
@@ -17,6 +19,29 @@
   function safeSet(key, value) { try { localStorage.setItem(key, value); } catch {} }
   function safeRemove(key) { try { localStorage.removeItem(key); } catch {} }
   function fmt(value) { try { return new Date(value).toLocaleString("pt-BR"); } catch { return value || ""; } }
+
+  function captureRedirectSession() {
+    try {
+      if (!location.hash || !location.hash.includes("access_token=")) return null;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (!access_token || !refresh_token) return null;
+      const value = {
+        access_token,
+        refresh_token,
+        token_type: params.get("token_type") || "bearer",
+        expires_in: Number(params.get("expires_in") || 3600)
+      };
+      safeSet(SESSION_KEY, JSON.stringify(value));
+      confirmedFromRedirect = true;
+      history.replaceState(null, document.title, location.pathname + location.search);
+      return value;
+    } catch (e) {
+      console.warn("Não foi possível ler o retorno da confirmação:", e);
+      return null;
+    }
+  }
 
   function decodeJwt(token) {
     try {
@@ -171,13 +196,14 @@
     if (!email || password.length < 6) return alert("Use um e-mail válido e uma senha com pelo menos 6 caracteres.");
     setStatus("Criando conta...", "warn");
     try {
-      const data = await api("/auth/v1/signup", { method: "POST", body: { email, password } });
+      const redirect = encodeURIComponent(APP_URL);
+      const data = await api(`/auth/v1/signup?redirect_to=${redirect}`, { method: "POST", body: { email, password } });
       if (data?.access_token) {
         saveSession(data);
         await reconcile(false);
       } else {
-        setStatus("Conta criada. Confirme seu e-mail e depois entre.", "ok");
-        alert("Conta criada. Confira seu e-mail para confirmar o cadastro. Depois volte ao Boletim Técnico e clique em Entrar.");
+        setStatus("Conta criada. Confirme seu e-mail.", "ok");
+        alert("Conta criada. Confira seu e-mail para confirmar o cadastro. O link deve voltar para o Boletim Técnico.");
       }
     } catch (e) {
       setStatus("Falha ao criar conta.", "warn");
@@ -285,6 +311,7 @@
   async function start() {
     injectUI();
     watchLocalChanges();
+    if (confirmedFromRedirect) setStatus("E-mail confirmado. Conectando e sincronizando...", "ok");
     if (session?.access_token) {
       updateUI();
       await reconcile(false);
