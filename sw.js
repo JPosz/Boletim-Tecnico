@@ -1,4 +1,4 @@
-const CACHE = "boletim-tecnico-v7";
+const CACHE = "boletim-tecnico-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -53,7 +53,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (new URL(event.request.url).pathname.endsWith("/sync.js")) {
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith("/sync.js") || url.pathname.endsWith("/sw.js")) {
     event.respondWith(
       fetch(event.request, { cache: "no-store" }).then(response => {
         const copy = response.clone();
