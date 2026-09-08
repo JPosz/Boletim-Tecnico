@@ -1,4 +1,4 @@
-const CACHE = "boletim-tecnico-v4";
+const CACHE = "boletim-tecnico-v5";
 const ASSETS = [
   "./",
   "./index.html",
