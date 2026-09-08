@@ -1,4 +1,4 @@
-const CACHE = "boletim-tecnico-v3";
+const CACHE = "boletim-tecnico-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -50,6 +50,17 @@ self.addEventListener("fetch", event => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(pageWithSync(event.request));
+    return;
+  }
+
+  if (new URL(event.request.url).pathname.endsWith("/sync.js")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).then(response => {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
     return;
   }
 
