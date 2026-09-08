@@ -14,10 +14,11 @@
 
   let confirmedFromRedirect = false;
   let session = captureRedirectSession() || loadLocalSession();
-  let lastLocalSnapshot = get(LOCAL_KEY);
   let syncBusy = false;
   let applyingRemote = false;
   let changeTimer = null;
+  let interactionUntil = 0;
+  let lastLocalSignature = signatureFromRaw(get(LOCAL_KEY));
 
   function get(key) {
     try { return localStorage.getItem(key); } catch { return null; }
@@ -31,11 +32,41 @@
     try { localStorage.removeItem(key); } catch {}
   }
 
-  function raw(obj) { return JSON.stringify(obj); }
-  function same(a, b) { return raw(a) === raw(b); }
+  function parse(raw) {
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  function stableStringify(value) {
+    if (value === null || typeof value !== "object") return JSON.stringify(value);
+    if (Array.isArray(value)) return "[" + value.map(stableStringify).join(",") + "]";
+    return "{" + Object.keys(value).sort().map(key => JSON.stringify(key) + ":" + stableStringify(value[key])).join(",") + "}";
+  }
+
+  function signature(value) {
+    return stableStringify(value);
+  }
+
+  function signatureFromRaw(raw) {
+    const obj = parse(raw);
+    return obj === null ? "" : signature(obj);
+  }
+
+  function same(a, b) {
+    return signature(a) === signature(b);
+  }
+
   function fmt(value) {
     try { return new Date(value).toLocaleString("pt-BR"); }
     catch { return value || ""; }
+  }
+
+  function markInteraction() {
+    interactionUntil = Date.now() + 1800;
+  }
+
+  function userIsEditing() {
+    return Date.now() < interactionUntil;
   }
 
   function openDb() {
@@ -389,15 +420,12 @@
 
     const row = Array.isArray(rows) ? rows[0] : null;
     const finalObj = row?.dados || obj;
-    const finalRaw = raw(finalObj);
-
-    set(BASE_KEY, finalRaw);
+    set(BASE_KEY, JSON.stringify(finalObj));
     set(DIRTY_KEY, "0");
-    lastLocalSnapshot = finalRaw;
     showConflict(false);
     setStatus(`Sincronizado${row?.updated_at ? " em " + fmt(row.updated_at) : ""}`, "ok");
 
-    return { obj: finalObj, raw: finalRaw };
+    return finalObj;
   }
 
   function mergeChanges(base, local, remote) {
@@ -426,27 +454,33 @@
     return out;
   }
 
-  async function pullRemote(remote) {
-    if (!remote?.dados) return;
-
-    const remoteRaw = raw(remote.dados);
+  function applyRemoteState(obj, statusText) {
+    const remoteRaw = JSON.stringify(obj);
     applyingRemote = true;
     set(LOCAL_KEY, remoteRaw);
     set(BASE_KEY, remoteRaw);
     set(DIRTY_KEY, "0");
-    lastLocalSnapshot = remoteRaw;
+    lastLocalSignature = signature(obj);
     applyingRemote = false;
-
     showConflict(false);
-    setStatus(`Atualizado da nuvem${remote.updated_at ? " em " + fmt(remote.updated_at) : ""}`, "ok");
-    setTimeout(() => location.reload(), 180);
+    if (statusText) setStatus(statusText, "ok");
+    setTimeout(() => location.reload(), 220);
+  }
+
+  async function pullRemote(remote) {
+    if (!remote?.dados) return;
+    applyRemoteState(
+      remote.dados,
+      `Atualizado da nuvem${remote.updated_at ? " em " + fmt(remote.updated_at) : ""}`
+    );
   }
 
   async function forcePush() {
     try {
-      const localRaw = get(LOCAL_KEY);
-      if (!localRaw) return;
-      await pushObject(JSON.parse(localRaw));
+      const local = parse(get(LOCAL_KEY));
+      if (!local) return;
+      const finalObj = await pushObject(local);
+      if (finalObj) lastLocalSignature = signature(local);
     } catch (e) {
       setStatus("Falha ao enviar este aparelho.", "warn");
       alert(e.message);
@@ -465,6 +499,13 @@
 
   async function reconcile(manual = false) {
     if (syncBusy || !session?.access_token) return;
+
+    if (!manual && userIsEditing()) {
+      clearTimeout(changeTimer);
+      changeTimer = setTimeout(() => reconcile(false), 1900);
+      return;
+    }
+
     if (!navigator.onLine) {
       if (manual) setStatus("Sem internet. Os dados continuam salvos neste aparelho.", "warn");
       return;
@@ -480,16 +521,17 @@
         else throw e;
       }
 
-      const localRaw = get(LOCAL_KEY);
-      const baseRaw = get(BASE_KEY);
-      const local = localRaw ? JSON.parse(localRaw) : null;
-      const base = baseRaw ? JSON.parse(baseRaw) : null;
+      const local = parse(get(LOCAL_KEY));
+      const base = parse(get(BASE_KEY));
       const remoteObj = remote?.dados || null;
-      const remoteRaw = remoteObj ? raw(remoteObj) : null;
 
       if (!remote) {
-        if (local) await pushObject(local);
-        else setStatus("Conectado. Ainda não há notas para sincronizar.", "ok");
+        if (local) {
+          const finalObj = await pushObject(local);
+          if (finalObj) lastLocalSignature = signature(local);
+        } else {
+          setStatus("Conectado. Ainda não há notas para sincronizar.", "ok");
+        }
         return;
       }
 
@@ -499,9 +541,10 @@
       }
 
       if (!base) {
-        if (localRaw === remoteRaw) {
-          set(BASE_KEY, localRaw);
+        if (same(local, remoteObj)) {
+          set(BASE_KEY, JSON.stringify(remoteObj));
           set(DIRTY_KEY, "0");
+          lastLocalSignature = signature(local);
           setStatus(`Sincronizado${remote.updated_at ? " em " + fmt(remote.updated_at) : ""}`, "ok");
         } else if (!hasMeaningfulLocalData(local)) {
           await pullRemote(remote);
@@ -512,24 +555,24 @@
         return;
       }
 
-      const localChanged = get(DIRTY_KEY) === "1" || localRaw !== baseRaw;
-      const remoteChanged = remoteRaw !== baseRaw;
+      const localChanged = get(DIRTY_KEY) === "1" || !same(local, base);
+      const remoteChanged = !same(remoteObj, base);
 
       if (localChanged) {
         const merged = remoteChanged ? mergeChanges(base, local, remoteObj) : local;
-        const before = localRaw;
-        const pushed = await pushObject(merged);
+        const finalObj = await pushObject(merged);
+        if (!finalObj) return;
 
-        if (pushed && pushed.raw !== before) {
-          applyingRemote = true;
-          set(LOCAL_KEY, pushed.raw);
-          lastLocalSnapshot = pushed.raw;
-          applyingRemote = false;
-          setTimeout(() => location.reload(), 180);
+        if (!same(finalObj, local)) {
+          applyRemoteState(finalObj, "Alterações mescladas e sincronizadas.");
+        } else {
+          lastLocalSignature = signature(local);
+          set(DIRTY_KEY, "0");
         }
       } else if (remoteChanged) {
         await pullRemote(remote);
       } else {
+        lastLocalSignature = signature(local);
         setStatus(`Sincronizado${remote.updated_at ? " em " + fmt(remote.updated_at) : ""}`, "ok");
       }
     } catch (e) {
@@ -542,21 +585,37 @@
 
   function watchLocal() {
     setInterval(() => {
-      const current = get(LOCAL_KEY);
-      if (current === lastLocalSnapshot) return;
-      lastLocalSnapshot = current;
+      const currentSignature = signatureFromRaw(get(LOCAL_KEY));
+      if (currentSignature === lastLocalSignature) return;
+      lastLocalSignature = currentSignature;
       if (applyingRemote) return;
 
       set(DIRTY_KEY, "1");
       if (!session?.access_token) return;
 
       clearTimeout(changeTimer);
-      changeTimer = setTimeout(() => reconcile(false), 700);
-    }, 350);
+      const delay = userIsEditing() ? 1900 : 650;
+      changeTimer = setTimeout(() => reconcile(false), delay);
+    }, 300);
+  }
+
+  function installInteractionGuards() {
+    document.addEventListener("input", e => {
+      if (e.target?.matches?.(".note-input, #cloudEmail, #cloudPassword")) markInteraction();
+    }, true);
+
+    document.addEventListener("change", e => {
+      if (e.target?.matches?.("[data-method-subject], .note-input")) markInteraction();
+    }, true);
+
+    document.addEventListener("click", e => {
+      if (e.target?.closest?.("[data-add-note], [data-remove-note], .reset-btn")) markInteraction();
+    }, true);
   }
 
   async function start() {
     injectUI();
+    installInteractionGuards();
 
     try {
       if (navigator.storage?.persist) await navigator.storage.persist();
@@ -579,7 +638,7 @@
       if (document.visibilityState === "visible") reconcile(false);
     });
 
-    setInterval(() => reconcile(false), 2000);
+    setInterval(() => reconcile(false), 3000);
   }
 
   if (document.readyState === "loading") {
